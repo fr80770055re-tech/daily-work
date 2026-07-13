@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<!-- 確保手機瀏覽器以正確比例顯示，並適應螢幕寬度 -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>今日聯絡簿</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+<style>
+  /* 手機優先 (Mobile First) 的版面設定 */
+  body {
+    background-color: #2c3e50;
+    margin: 0;
+    /* 縮小手機兩側留白，爭取最大閱讀空間 */
+    padding: 10px; 
+    font-family: '微軟正黑體', 'PingFang TC', 'Apple LiGothic', sans-serif;
+    color: #f8f9fa;
+    display: flex;
+    justify-content: center;
+    min-height: 100vh;
+    align-items: flex-start;
+  }
+  
+  .blackboard {
+    background-color: #1a4f36; 
+    /* 將木框稍微調細，避免佔用手機太多寬度 */
+    border: 8px solid #5c4033; 
+    border-radius: 8px;
+    box-shadow: 3px 3px 10px rgba(0,0,0,0.5);
+    width: 100%;
+    max-width: 600px;
+    /* 縮小內邊距，讓文字有更大空間 */
+    padding: 15px 15px 25px 15px; 
+    box-sizing: border-box;
+  }
+  
+  .title {
+    text-align: center;
+    font-size: 1.3em; /* 稍微縮小標題，避免在小螢幕折行 */
+    border-bottom: 2px dashed rgba(255,255,255,0.4);
+    padding-bottom: 12px;
+    margin-bottom: 15px;
+    letter-spacing: 1px;
+    font-weight: bold;
+  }
+  
+  .date {
+    font-size: 1.1em;
+    color: #ffeb3b; 
+    margin-bottom: 12px;
+    font-weight: bold;
+  }
+  
+  .content {
+    /* 放大正文字體，提升家長閱讀舒適度 */
+    font-size: 1.1em; 
+    line-height: 1.7;
+    white-space: pre-wrap;
+    /* 確保長串英文或網址不會撐破黑板 (非常重要) */
+    word-wrap: break-word; 
+    min-height: 100px;
+  }
+  
+  .btn {
+    display: block;
+    width: 100%;
+    /* 增加按鈕高度，符合手機人體工學 (好點擊) */
+    padding: 14px; 
+    margin-top: 25px;
+    background: rgba(0,0,0,0.25);
+    color: white;
+    border: 1px solid rgba(255,255,255,0.6);
+    border-radius: 8px;
+    font-size: 1.1em;
+    cursor: pointer;
+    font-family: inherit;
+    /* 增加點擊的回饋感 */
+    transition: background 0.2s; 
+  }
+  
+  /* 按鈕按下去的視覺回饋 (取代滑鼠 hover) */
+  .btn:active {
+    background: rgba(255,255,255,0.4); 
+  }
+
+  #history-section {
+    display: none;
+    margin-top: 20px;
+    border-top: 2px dashed rgba(255,255,255,0.4);
+    padding-top: 15px;
+  }
+  
+  .history-item {
+    margin-bottom: 15px;
+    padding: 12px;
+    background: rgba(0,0,0,0.2);
+    border-radius: 6px;
+    border-left: 4px solid #ffeb3b;
+  }
+  
+  .history-date {
+    color: #ffeb3b;
+    font-weight: bold;
+    font-size: 0.95em;
+    margin-bottom: 6px;
+  }
+  
+  .history-content {
+    font-size: 1em;
+    line-height: 1.6;
+    word-wrap: break-word;
+    white-space: pre-wrap;
+  }
+  
+  .loading {
+    text-align: center;
+    font-size: 1.1em;
+    color: #ffeb3b;
+    padding: 20px 0;
+  }
+</style>
+</head>
+<body>
+
+<div class="blackboard">
+  <div class="title">📝 五年級班級聯絡簿</div>
+  
+  <div id="loading" class="loading">正在擦黑板與讀取最新資料...</div>
+
+  <div id="main-content" style="display: none;">
+    <div class="date" id="today-date"></div>
+    <div class="content" id="today-homework"></div>
+    
+    <button class="btn" onclick="toggleHistory()">📅 查看歷史紀錄</button>
+    
+    <div id="history-section"></div>
+  </div>
+</div>
+
+<script>
+  // ⚠️ 記得把這裡替換成您的 Google 試算表 CSV 網址 ⚠️
+  const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTzJEmaIbAlYru1hX5H69-fAg7PUrQS2DNOI57OPIEgxLekeISkxlZcl5Ld1ctHpXMJqHwGaGWmcKet/pub?output=csv';
+
+  document.addEventListener("DOMContentLoaded", () => {
+    Papa.parse(CSV_URL, {
+      download: true,
+      header: true, 
+      complete: function(results) {
+        const data = results.data.filter(row => row['日期'] && row['聯絡簿內容']); 
+        
+        if (data.length === 0) {
+          document.getElementById('loading').innerText = "目前還沒有聯絡簿資料喔！";
+          return;
+        }
+
+        const reversedData = data.reverse();
+        
+        const latestEntry = reversedData[0];
+        document.getElementById('today-date').innerText = "📅 " + latestEntry['日期'];
+        document.getElementById('today-homework').innerText = latestEntry['聯絡簿內容'];
+
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('main-content').style.display = 'block';
+
+        const historyContainer = document.getElementById('history-section');
+        for (let i = 1; i < reversedData.length; i++) {
+          const item = reversedData[i];
+          const div = document.createElement('div');
+          div.className = 'history-item';
+          div.innerHTML = `<div class="history-date">${item['日期']}</div>
+                           <div class="history-content">${item['聯絡簿內容']}</div>`;
+          historyContainer.appendChild(div);
+        }
+      },
+      error: function() {
+        document.getElementById('loading').innerText = "讀取失敗，請確認 CSV 連結是否正確。";
+      }
+    });
+  });
+
+  function toggleHistory() {
+    const historySection = document.getElementById('history-section');
+    if (historySection.style.display === 'none' || historySection.style.display === '') {
+      historySection.style.display = 'block';
+      // 點擊後讓畫面稍微往下滑，引導家長看到歷史紀錄
+      setTimeout(() => {
+        historySection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
+    } else {
+      historySection.style.display = 'none';
+    }
+  }
+</script>
+
+</body>
+</html>
